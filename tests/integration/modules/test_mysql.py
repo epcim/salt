@@ -5,16 +5,17 @@ from __future__ import absolute_import
 import logging
 
 # Import Salt Testing libs
-import tests.integration as integration
+from tests.support.case import ModuleCase
 from tests.support.unit import skipIf
 from tests.support.helpers import destructiveTest
+from tests.support.mixins import SaltReturnAssertsMixin
 
 # Import salt libs
-import salt.utils
+import salt.utils.path
 from salt.modules import mysql as mysqlmod
 
 # Import 3rd-party libs
-import salt.ext.six as six
+from salt.ext import six
 from salt.ext.six.moves import range  # pylint: disable=import-error,redefined-builtin
 
 log = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ try:
 except Exception:
     NO_MYSQL = True
 
-if not salt.utils.which('mysqladmin'):
+if not salt.utils.path.which('mysqladmin'):
     NO_MYSQL = True
 
 
@@ -34,8 +35,7 @@ if not salt.utils.which('mysqladmin'):
     'Please install MySQL bindings and a MySQL Server before running'
     'MySQL integration tests.'
 )
-class MysqlModuleDbTest(integration.ModuleCase,
-                        integration.SaltReturnAssertsMixIn):
+class MysqlModuleDbTest(ModuleCase, SaltReturnAssertsMixin):
     '''
     Module testing database creation on a real MySQL Server.
     '''
@@ -615,8 +615,7 @@ class MysqlModuleDbTest(integration.ModuleCase,
     'Please install MySQL bindings and a MySQL Server before running'
     'MySQL integration tests.'
 )
-class MysqlModuleUserTest(integration.ModuleCase,
-                      integration.SaltReturnAssertsMixIn):
+class MysqlModuleUserTest(ModuleCase, SaltReturnAssertsMixin):
     '''
     User Creation and connection tests
     '''
@@ -1269,8 +1268,7 @@ class MysqlModuleUserTest(integration.ModuleCase,
     'Please install MySQL bindings and a MySQL Server before running'
     'MySQL integration tests.'
 )
-class MysqlModuleUserGrantTest(integration.ModuleCase,
-                      integration.SaltReturnAssertsMixIn):
+class MysqlModuleUserGrantTest(ModuleCase, SaltReturnAssertsMixin):
     '''
     User Creation and connection tests
     '''

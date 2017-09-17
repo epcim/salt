@@ -49,15 +49,17 @@
 # Import Python modules
 from __future__ import absolute_import, print_function
 import os
+import sys
 import json
 import shutil
 import logging
-import platform
-import tempfile
 import multiprocessing
 
+# Import tests support libs
+import tests.support.paths as paths
+
 # Import 3rd-party libs
-import salt.ext.six as six
+from salt.ext import six
 try:
     import coverage  # pylint: disable=import-error
     HAS_COVERAGE = True
@@ -100,6 +102,13 @@ try:
         )
 except ImportError:
     pass
+
+if sys.platform.startswith('win'):
+    import win32api  # pylint: disable=import-error
+    RUNNING_TESTS_USER = win32api.GetUserName()
+else:
+    import pwd
+    RUNNING_TESTS_USER = pwd.getpwuid(os.getuid()).pw_name
 
 log = logging.getLogger(__name__)
 
@@ -180,33 +189,34 @@ class RuntimeVars(object):
 # <---- Helper Methods -----------------------------------------------------------------------------------------------
 
 # ----- Global Variables -------------------------------------------------------------------------------------------->
-CONF_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), '_saltconf')
-SYS_TMP_DIR = os.path.realpath(
-    # Avoid ${TMPDIR} and gettempdir() on MacOS as they yield a base path too long for unix sockets:
-    # 'error: AF_UNIX path too long'
-    # Gentoo Portage prefers ebuild tests are rooted in ${TMPDIR}
-    os.environ.get('TMPDIR', tempfile.gettempdir()) if platform.system() != 'Darwin' else '/tmp'
-)
-__TMP = os.path.join(SYS_TMP_DIR, 'salt-tests-tmpdir')
-XML_OUTPUT_DIR = os.environ.get('SALT_XML_TEST_REPORTS_DIR', os.path.join(__TMP, 'xml-test-reports'))
+XML_OUTPUT_DIR = os.environ.get('SALT_XML_TEST_REPORTS_DIR', os.path.join(paths.TMP, 'xml-test-reports'))
 # <---- Global Variables ---------------------------------------------------------------------------------------------
 
 
 # ----- Tests Runtime Variables ------------------------------------------------------------------------------------->
 
 RUNTIME_VARS = RuntimeVars(
-    TMP=__TMP,
-    TMP_CONF_DIR=os.path.join(__TMP, 'conf'),
-    TMP_CONF_MASTER_INCLUDES=os.path.join(__TMP, 'conf', 'master.d'),
-    TMP_CONF_MINION_INCLUDES=os.path.join(__TMP, 'conf', 'minion.d'),
-    TMP_CONF_CLOUD_INCLUDES=os.path.join(__TMP, 'conf', 'cloud.conf.d'),
-    TMP_CONF_CLOUD_PROFILE_INCLUDES=os.path.join(__TMP, 'conf', 'cloud.profiles.d'),
-    TMP_CONF_CLOUD_PROVIDER_INCLUDES=os.path.join(__TMP, 'conf', 'cloud.providers.d'),
-    TMP_SCRIPT_DIR=os.path.join(__TMP, 'scripts'),
-    TMP_SALT_INTEGRATION_FILES=os.path.join(__TMP, 'integration-files'),
-    TMP_BASEENV_STATE_TREE=os.path.join(__TMP, 'integration-files', 'file', 'base'),
-    TMP_PRODENV_STATE_TREE=os.path.join(__TMP, 'integration-files', 'file', 'prod'),
-    TMP_BASEENV_PILLAR_TREE=os.path.join(__TMP, 'integration-files', 'pillar', 'base'),
-    TMP_PRODENV_PILLAR_TREE=os.path.join(__TMP, 'integration-files', 'pillar', 'prod')
+    TMP=paths.TMP,
+    SYS_TMP_DIR=paths.SYS_TMP_DIR,
+    FILES=paths.FILES,
+    CONF_DIR=paths.CONF_DIR,
+    PILLAR_DIR=paths.PILLAR_DIR,
+    ENGINES_DIR=paths.ENGINES_DIR,
+    LOG_HANDLERS_DIR=paths.LOG_HANDLERS_DIR,
+    TMP_CONF_DIR=paths.TMP_CONF_DIR,
+    TMP_CONF_MASTER_INCLUDES=os.path.join(paths.TMP_CONF_DIR, 'master.d'),
+    TMP_CONF_MINION_INCLUDES=os.path.join(paths.TMP_CONF_DIR, 'minion.d'),
+    TMP_CONF_PROXY_INCLUDES=os.path.join(paths.TMP_CONF_DIR, 'proxy.d'),
+    TMP_CONF_CLOUD_INCLUDES=os.path.join(paths.TMP_CONF_DIR, 'cloud.conf.d'),
+    TMP_CONF_CLOUD_PROFILE_INCLUDES=os.path.join(paths.TMP_CONF_DIR, 'cloud.profiles.d'),
+    TMP_CONF_CLOUD_PROVIDER_INCLUDES=os.path.join(paths.TMP_CONF_DIR, 'cloud.providers.d'),
+    TMP_SUB_MINION_CONF_DIR=paths.TMP_SUB_MINION_CONF_DIR,
+    TMP_SYNDIC_MASTER_CONF_DIR=paths.TMP_SYNDIC_MASTER_CONF_DIR,
+    TMP_SYNDIC_MINION_CONF_DIR=paths.TMP_SYNDIC_MINION_CONF_DIR,
+    TMP_SCRIPT_DIR=paths.TMP_SCRIPT_DIR,
+    TMP_STATE_TREE=paths.TMP_STATE_TREE,
+    TMP_PRODENV_STATE_TREE=paths.TMP_PRODENV_STATE_TREE,
+    RUNNING_TESTS_USER=RUNNING_TESTS_USER,
+    RUNTIME_CONFIGS={}
 )
 # <---- Tests Runtime Variables --------------------------------------------------------------------------------------

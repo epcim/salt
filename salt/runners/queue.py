@@ -52,10 +52,8 @@ master and it will run the specified amount of commands per time period.
     schedule:
       runner queue:
         schedule:
-          function: saltutil.runner
+          function: queue.process_runner
           minutes: 1
-          args:
-            - queue.process_runner
           kwargs:
             quantity: 2
 
@@ -70,7 +68,7 @@ from __future__ import absolute_import
 
 # Import salt libs
 import salt.loader
-import salt.ext.six as six
+from salt.ext import six
 from salt.utils.event import get_event, tagify
 from salt.exceptions import SaltInvocationError
 

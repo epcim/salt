@@ -4,14 +4,15 @@
 from __future__ import absolute_import
 
 # Import Salt Testing libs
-import tests.integration as integration
-from tests.support.unit import skipIf
+from tests.support.unit import TestCase
+from tests.support.mixins import AdaptedConfigurationTestCaseMixin
 
 # Import Salt libs
 import salt.runner
 
 
-class RunnerModuleTest(integration.TestCase, integration.AdaptedConfigurationTestCaseMixIn):
+class RunnerModuleTest(TestCase, AdaptedConfigurationTestCaseMixin):
+    # This is really an integration test since it needs a salt-master running
     eauth_creds = {
         'username': 'saltdev_auto',
         'password': 'saltdev',
@@ -57,7 +58,6 @@ class RunnerModuleTest(integration.TestCase, integration.AdaptedConfigurationTes
             'token': token['token'],
         })
 
-    @skipIf(True, 'to be reenabled when #23623 is merged')
     def test_cmd_sync(self):
         low = {
             'client': 'runner',
@@ -76,7 +76,6 @@ class RunnerModuleTest(integration.TestCase, integration.AdaptedConfigurationTes
 
         self.runner.cmd_async(low)
 
-    @skipIf(True, 'to be reenabled when #23623 is merged')
     def test_cmd_sync_w_arg(self):
         low = {
             'fun': 'test.arg',
@@ -89,7 +88,6 @@ class RunnerModuleTest(integration.TestCase, integration.AdaptedConfigurationTes
         self.assertEqual(ret['kwargs']['foo'], 'Foo!')
         self.assertEqual(ret['kwargs']['bar'], 'Bar!')
 
-    @skipIf(True, 'to be reenabled when #23623 is merged')
     def test_wildcard_auth(self):
         low = {
             'username': 'the_s0und_of_t3ch',
@@ -106,3 +104,43 @@ class RunnerModuleTest(integration.TestCase, integration.AdaptedConfigurationTes
         low.update(self.eauth_creds)
         ret = self.runner.cmd_sync(low, full_return=True)
         self.assertIn('success', ret['data'])
+
+    def test_cmd_sync_arg_kwarg_parsing(self):
+        low = {
+            'client': 'runner',
+            'fun': 'test.arg',
+            'arg': [
+                'foo',
+                'bar=off',
+                'baz={qux: 123}'
+            ],
+            'kwarg': {
+                'quux': 'Quux',
+            },
+            'quuz': 'on',
+        }
+        low.update(self.eauth_creds)
+
+        ret = self.runner.cmd_sync(low)
+        self.assertEqual(ret, {
+            'args': ['foo'],
+            'kwargs': {
+                'bar': False,
+                'baz': {
+                    'qux': 123,
+                },
+                'quux': 'Quux',
+                'quuz': 'on',
+            },
+        })
+
+    def test_invalid_kwargs_are_ignored(self):
+        low = {
+            'client': 'runner',
+            'fun': 'test.metasyntactic',
+            'thiskwargisbad': 'justpretendimnothere',
+        }
+        low.update(self.eauth_creds)
+
+        ret = self.runner.cmd_sync(low)
+        self.assertEqual(ret[0], 'foo')

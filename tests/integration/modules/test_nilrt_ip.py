@@ -3,21 +3,22 @@
 integration tests for nilirt_ip
 '''
 
-# Import python libs
+# Import Python libs
 from __future__ import absolute_import
 import time
 
 # Import Salt Testing libs
-import tests.integration as integration
+from tests.support.case import ModuleCase
 from tests.support.unit import skipIf
-from tests.support.helpers import destructiveTest
+from tests.support.helpers import destructiveTest, skip_if_not_root
 
-# Import salt libs
-import salt.utils
+# Import Salt libs
+import salt.utils.platform
 
 
-@skipIf(not salt.utils.is_linux(), 'These tests can only be run on linux')
-class Nilrt_ipModuleTest(integration.ModuleCase):
+@skip_if_not_root
+@skipIf(not salt.utils.platform.is_linux(), 'These tests can only be run on linux')
+class Nilrt_ipModuleTest(ModuleCase):
     '''
     Validate the nilrt_ip module
     '''
@@ -35,8 +36,6 @@ class Nilrt_ipModuleTest(integration.ModuleCase):
         if os_grain['os_family'] != 'NILinuxRT':
             self.skipTest('Tests applicable only to NILinuxRT')
         super(Nilrt_ipModuleTest, self).setUp()
-        if salt.utils.get_uid(salt.utils.get_user()) != 0:
-            self.skipTest('Test requires root')
         self.run_function('file.copy', ['/var/lib/connman', '/tmp/connman', 'recurse=True', 'remove_existing=True'])
 
     def tearDown(self):

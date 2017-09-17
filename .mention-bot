@@ -1,7 +1,17 @@
 {
+  "alwaysNotifyForPaths": [
+    {
+      "name": "ryan-lane",
+      "files": ["salt/**/*boto*.py"],
+      "skipTeamPrs": false
+    },
+    {
+      "name": "tkwilliams",
+      "files": ["salt/**/*boto*.py"],
+      "skipTeamPrs": false
+    }
+  ],
  "skipTitle": "Merge forward",
- "delayed": true,
- "delayedUntil": "2h",
- "userBlacklist": []
+ "userBlacklist": ["cvrebert", "markusgattol", "olliewalsh", "basepi"]
 }
 

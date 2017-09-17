@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
     :codeauthor: :email:`Pedro Algarvio (pedro@algarvio.me)`
-    :copyright: © 2017 by the SaltStack Team, see AUTHORS for more details.
+    :copyright: Copyright 2017 by the SaltStack Team, see AUTHORS for more details.
     :license: Apache 2.0, see LICENSE for more details.
 
 
@@ -22,8 +22,11 @@ import tempfile
 log = logging.getLogger(__name__)
 
 TESTS_DIR = os.path.dirname(os.path.dirname(os.path.normpath(os.path.abspath(__file__))))
-if os.name == 'nt':
-    TESTS_DIR = TESTS_DIR.replace('\\', '\\\\')
+if TESTS_DIR.startswith('//'):
+    # Have we been given an initial double forward slash? Ditch it!
+    TESTS_DIR = TESTS_DIR[1:]
+if sys.platform.startswith('win'):
+    TESTS_DIR = os.path.normcase(TESTS_DIR)
 CODE_DIR = os.path.dirname(TESTS_DIR)
 INTEGRATION_TEST_DIR = os.path.join(TESTS_DIR, 'integration')
 
@@ -37,12 +40,12 @@ if CODE_DIR not in sys.path:
 if TESTS_DIR not in sys.path:
     sys.path.insert(1, TESTS_DIR)
 
-SYS_TMP_DIR = os.path.realpath(
+SYS_TMP_DIR = os.path.abspath(os.path.realpath(
     # Avoid ${TMPDIR} and gettempdir() on MacOS as they yield a base path too long
     # for unix sockets: ``error: AF_UNIX path too long``
     # Gentoo Portage prefers ebuild tests are rooted in ${TMPDIR}
     os.environ.get('TMPDIR', tempfile.gettempdir()) if not sys.platform.startswith('darwin') else '/tmp'
-)
+))
 TMP = os.path.join(SYS_TMP_DIR, 'salt-tests-tmpdir')
 FILES = os.path.join(INTEGRATION_TEST_DIR, 'files')
 PYEXEC = 'python{0}.{1}'.format(*sys.version_info)
@@ -54,6 +57,7 @@ TMP_CONF_DIR = os.path.join(TMP, 'config')
 TMP_SUB_MINION_CONF_DIR = os.path.join(TMP_CONF_DIR, 'sub-minion')
 TMP_SYNDIC_MINION_CONF_DIR = os.path.join(TMP_CONF_DIR, 'syndic-minion')
 TMP_SYNDIC_MASTER_CONF_DIR = os.path.join(TMP_CONF_DIR, 'syndic-master')
+TMP_PROXY_CONF_DIR = os.path.join(TMP_CONF_DIR, 'proxy')
 CONF_DIR = os.path.join(INTEGRATION_TEST_DIR, 'files', 'conf')
 PILLAR_DIR = os.path.join(FILES, 'pillar')
 TMP_SCRIPT_DIR = os.path.join(TMP, 'scripts')
@@ -77,9 +81,9 @@ SCRIPT_TEMPLATES = {
     ],
     'common': [
         'from salt.scripts import salt_{0}\n',
-        'from salt.utils import is_windows\n\n',
+        'import salt.utils.platform\n\n',
         'if __name__ == \'__main__\':\n',
-        '    if is_windows():\n',
+        '    if salt.utils.platform.is_windows():\n',
         '        import os.path\n',
         '        import py_compile\n',
         '        cfile = os.path.splitext(__file__)[0] + ".pyc"\n',
@@ -106,9 +110,9 @@ class ScriptPathMixin(object):
             log.info('Generating {0}'.format(script_path))
 
             # Late import
-            import salt.utils
+            import salt.utils.files
 
-            with salt.utils.fopen(script_path, 'w') as sfh:
+            with salt.utils.files.fopen(script_path, 'w') as sfh:
                 script_template = SCRIPT_TEMPLATES.get(script_name, None)
                 if script_template is None:
                     script_template = SCRIPT_TEMPLATES.get('common', None)

@@ -58,7 +58,7 @@ You can also provide a list of config files:
 Select config files through grains|pillar|opts matching
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can also opt for a much more flexible configuration: MakoStack allows to
+You can also opt for a much more flexible configuration: MakoStack allows one to
 select the config files for the current minion based on matching values from
 either grains, or pillar, or opts objects.
 
@@ -381,7 +381,7 @@ from functools import partial
 import yaml
 
 # Import Salt libs
-import salt.ext.six as six
+from salt.ext import six
 
 try:
     from mako.lookup import TemplateLookup
@@ -465,7 +465,7 @@ def _process_stack_cfg(cfg, stack, minion_id, pillar, namespace):
                 for sub in namespace.split(':')[::-1]:
                     obj = {sub: obj}
             stack = _merge_dict(stack, obj)
-            log.info('Stack template {0} parsed'.format(path))
+            log.info('Stack template "{0}" parsed'.format(path))
         except exceptions.TopLevelLookupException as e:
             log.info('Stack template "{0}" not found.'.format(path))
             continue

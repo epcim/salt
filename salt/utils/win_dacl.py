@@ -134,7 +134,7 @@ import logging
 # Import Salt libs
 from salt.exceptions import CommandExecutionError, SaltInvocationError
 from salt.ext.six.moves import range
-import salt.ext.six as six
+from salt.ext import six
 
 # Import 3rd-party libs
 HAS_WIN32 = False
@@ -913,7 +913,7 @@ def dacl(obj_name=None, obj_type='file'):
                             self.ace_perms[obj_type]['advanced'][perm])
 
             # If still nothing, it must be undefined
-            if not ace_perms[0]:
+            if not ace_perms:
                 ace_perms = ['Undefined Permission: {0}'.format(ace[1])]
 
             return principal, ace_type, ace_prop, ace_perms, inherited
@@ -1005,7 +1005,7 @@ def dacl(obj_name=None, obj_type='file'):
                     None, None, self.dacl, None)
             except pywintypes.error as exc:
                 raise CommandExecutionError(
-                    'Failed to set permissions: {0}'.format(exc[2]))
+                    'Failed to set permissions: {0}'.format(exc.strerror))
 
             return True
 
@@ -1035,6 +1035,10 @@ def get_sid(principal):
         # Verify that the sid is valid
         salt.utils.win_dacl.get_sid('S-1-5-32-544')
     '''
+    # If None is passed, use the Universal Well-known SID "Null SID"
+    if principal is None:
+        principal = 'NULL SID'
+
     # Test if the user passed a sid or a name
     try:
         sid = salt.utils.win_functions.get_sid_from_name(principal)
@@ -1074,6 +1078,10 @@ def get_sid_string(principal):
         # Get the string version of the SID
         salt.utils.win_dacl.get_sid_string(py_sid)
     '''
+    # If None is passed, use the Universal Well-known SID "Null SID"
+    if principal is None:
+        principal = 'NULL SID'
+
     try:
         return win32security.ConvertSidToStringSid(principal)
     except TypeError:
@@ -1104,6 +1112,10 @@ def get_name(principal):
         salt.utils.win_dacl.get_name('S-1-5-32-544')
         salt.utils.win_dacl.get_name('adminisTrators')
     '''
+    # If None is passed, use the Universal Well-known SID for "Null SID"
+    if principal is None:
+        principal = 'S-1-0-0'
+
     # Assume PySID object
     sid_obj = principal
 
@@ -1161,7 +1173,7 @@ def get_owner(obj_name):
             owner_sid = 'S-1-1-0'
         else:
             raise CommandExecutionError(
-                'Failed to set permissions: {0}'.format(exc[2]))
+                'Failed to set permissions: {0}'.format(exc.strerror))
 
     return get_name(win32security.ConvertSidToStringSid(owner_sid))
 
@@ -1201,7 +1213,7 @@ def get_primary_group(obj_name):
             primary_group_gid = 'S-1-1-0'
         else:
             raise CommandExecutionError(
-                'Failed to set permissions: {0}'.format(exc[2]))
+                'Failed to set permissions: {0}'.format(exc.strerror))
 
     return get_name(win32security.ConvertSidToStringSid(primary_group_gid))
 
@@ -1265,9 +1277,9 @@ def set_owner(obj_name, principal, obj_type='file'):
             sid,
             None, None, None)
     except pywintypes.error as exc:
-        log.debug('Failed to make {0} the owner: {1}'.format(principal, exc[2]))
+        log.debug('Failed to make {0} the owner: {1}'.format(principal, exc.strerror))
         raise CommandExecutionError(
-            'Failed to set owner: {0}'.format(exc[2]))
+            'Failed to set owner: {0}'.format(exc.strerror))
 
     return True
 
@@ -1340,9 +1352,9 @@ def set_primary_group(obj_name, principal, obj_type='file'):
     except pywintypes.error as exc:
         log.debug(
             'Failed to make {0} the primary group: {1}'
-            ''.format(principal, exc[2]))
+            ''.format(principal, exc.strerror))
         raise CommandExecutionError(
-            'Failed to set primary group: {0}'.format(exc[2]))
+            'Failed to set primary group: {0}'.format(exc.strerror))
 
     return True
 

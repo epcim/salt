@@ -5,7 +5,7 @@
 The minionswarm script will start a group of salt minions with different ids
 on a single system to test scale capabilities
 '''
-
+# pylint: disable=resource-leakage
 # Import Python Libs
 from __future__ import absolute_import, print_function
 import os
@@ -19,13 +19,14 @@ import tempfile
 import shutil
 import sys
 import hashlib
+import uuid
 
 # Import salt libs
 import salt
 
 # Import third party libs
 import yaml
-import salt.ext.six as six
+from salt.ext import six
 from salt.ext.six.moves import range  # pylint: disable=import-error,redefined-builtin
 
 
@@ -96,6 +97,12 @@ def parse():
         default=False,
         action='store_true',
         help='Each Minion claims a different machine id grain')
+    parser.add_option(
+        '--rand-uuid',
+        dest='rand_uuid',
+        default=False,
+        action='store_true',
+        help='Each Minion claims a different UUID grain')
     parser.add_option(
         '-k',
         '--keep-modules',
@@ -347,6 +354,8 @@ class MinionSwarm(Swarm):
             data['grains']['saltversion'] = random.choice(VERS)
         if self.opts['rand_machine_id']:
             data['grains']['machine_id'] = hashlib.md5(minion_id).hexdigest()
+        if self.opts['rand_uuid']:
+            data['grains']['uuid'] = str(uuid.uuid4())
 
         with open(path, 'w+') as fp_:
             yaml.dump(data, fp_)

@@ -36,8 +36,8 @@ from tests.support.case import TestCase
 
 # Import 3rd-party libs
 # pylint: disable=import-error
-import cherrypy
-import salt.ext.six as six
+import cherrypy  # pylint: disable=3rd-party-module-not-gated
+from salt.ext import six
 from salt.ext.six.moves import StringIO
 # pylint: enable=import-error
 
@@ -117,8 +117,11 @@ class BaseCherryPyTestCase(TestCase):
                 fd.close()
                 fd = None
 
-        if response.output_status.startswith('500'):
-            print(response.body)
+        if response.output_status.startswith(six.b('500')):
+            response_body = response.collapse_body()
+            if six.PY3:
+                response_body = response_body.decode(__salt_system_encoding__)
+            print(response_body)
             raise AssertionError("Unexpected error")
 
         # collapse the response into a bytestring
