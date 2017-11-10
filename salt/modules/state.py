@@ -1395,7 +1395,6 @@ def show_states(queue=False, **kwargs):
     finally:
         st_.pop_active()
 
-
     if not isinstance(result, list):
         raise Exception(result)
 
