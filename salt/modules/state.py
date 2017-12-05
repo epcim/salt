@@ -44,6 +44,7 @@ from salt.utils.odict import OrderedDict
 
 # Import 3rd-party libs
 from salt.ext import six
+import msgpack
 
 __proxyenabled__ = ['*']
 
@@ -166,6 +167,99 @@ def _snapper_post(opts, jid, pre_num):
         log.error('Failed to create snapper pre snapshot for jid: {0}'.format(jid))
 
 
+def pause(jid, state_id=None, duration=None):
+    '''
+    Set up a state id pause, this instructs a running state to pause at a given
+    state id. This needs to pass in the jid of the running state and can
+    optionally pass in a duration in seconds. If a state_id is not passed then
+    the jid referenced will be paused at the begining of the next state run.
+
+    The given state id is the id got a given state execution, so given a state
+    that looks like this:
+
+    .. code-block:: yaml
+
+        vim:
+          pkg.installed: []
+
+    The state_id to pass to `pause` is `vim`
+
+    CLI Examples:
+
+    .. code-block:: bash
+
+        salt '*' state.pause 20171130110407769519
+        salt '*' state.pause 20171130110407769519 vim
+        salt '*' state.pause 20171130110407769519 vim 20
+    '''
+    jid = str(jid)
+    if state_id is None:
+        state_id = '__all__'
+    pause_dir = os.path.join(__opts__[u'cachedir'], 'state_pause')
+    pause_path = os.path.join(pause_dir, jid)
+    if not os.path.exists(pause_dir):
+        try:
+            os.makedirs(pause_dir)
+        except OSError:
+            # File created in the gap
+            pass
+    data = {}
+    if os.path.exists(pause_path):
+        with salt.utils.files.fopen(pause_path, 'rb') as fp_:
+            data = msgpack.loads(fp_.read())
+    if state_id not in data:
+        data[state_id] = {}
+    if duration:
+        data[state_id]['duration'] = int(duration)
+    with salt.utils.files.fopen(pause_path, 'wb') as fp_:
+        fp_.write(msgpack.dumps(data))
+
+
+def resume(jid, state_id=None):
+    '''
+    Remove a pause from a jid, allowing it to continue. If the state_id is
+    not specified then the a general pause will be resumed.
+
+    The given state_id is the id got a given state execution, so given a state
+    that looks like this:
+
+    .. code-block:: yaml
+
+        vim:
+          pkg.installed: []
+
+    The state_id to pass to `rm_pause` is `vim`
+
+    CLI Examples:
+
+    .. code-block:: bash
+
+        salt '*' state.resume 20171130110407769519
+        salt '*' state.resume 20171130110407769519 vim
+    '''
+    jid = str(jid)
+    if state_id is None:
+        state_id = '__all__'
+    pause_dir = os.path.join(__opts__[u'cachedir'], 'state_pause')
+    pause_path = os.path.join(pause_dir, jid)
+    if not os.path.exists(pause_dir):
+        try:
+            os.makedirs(pause_dir)
+        except OSError:
+            # File created in the gap
+            pass
+    data = {}
+    if os.path.exists(pause_path):
+        with salt.utils.files.fopen(pause_path, 'rb') as fp_:
+            data = msgpack.loads(fp_.read())
+    else:
+        return True
+    if state_id in data:
+        data.pop(state_id)
+    with salt.utils.files.fopen(pause_path, 'wb') as fp_:
+        fp_.write(msgpack.dumps(data))
+
+
 def orchestrate(mods,
                 saltenv='base',
                 test=None,
@@ -271,10 +365,14 @@ def _get_opts(**kwargs):
 
     if 'saltenv' in kwargs:
         saltenv = kwargs['saltenv']
-        if saltenv is not None and not isinstance(saltenv, six.string_types):
-            opts['environment'] = str(kwargs['saltenv'])
-        else:
-            opts['environment'] = kwargs['saltenv']
+        if saltenv is not None:
+            if not isinstance(saltenv, six.string_types):
+                saltenv = six.text_type(saltenv)
+            if opts['lock_saltenv'] and saltenv != opts['saltenv']:
+                raise CommandExecutionError(
+                    'lock_saltenv is enabled, saltenv cannot be changed'
+                )
+            opts['saltenv'] = kwargs['saltenv']
 
     if 'pillarenv' in kwargs or opts.get('pillarenv_from_saltenv', False):
         pillarenv = kwargs.get('pillarenv') or kwargs.get('saltenv')
@@ -841,7 +939,7 @@ def highstate(test=None, queue=False, **kwargs):
         kwargs.pop('env')
 
     if 'saltenv' in kwargs:
-        opts['environment'] = kwargs['saltenv']
+        opts['saltenv'] = kwargs['saltenv']
 
     if 'pillarenv' in kwargs:
         opts['pillarenv'] = kwargs['pillarenv']
@@ -1033,8 +1131,8 @@ def sls(mods, test=None, exclude=None, queue=False, **kwargs):
 
     # Since this is running a specific SLS file (or files), fall back to the
     # 'base' saltenv if none is configured and none was passed.
-    if opts['environment'] is None:
-        opts['environment'] = 'base'
+    if opts['saltenv'] is None:
+        opts['saltenv'] = 'base'
 
     pillar_override = kwargs.get('pillar')
     pillar_enc = kwargs.get('pillar_enc')
@@ -1090,7 +1188,7 @@ def sls(mods, test=None, exclude=None, queue=False, **kwargs):
     st_.push_active()
     ret = {}
     try:
-        high_, errors = st_.render_highstate({opts['environment']: mods})
+        high_, errors = st_.render_highstate({opts['saltenv']: mods})
 
         if errors:
             __context__['retcode'] = 1
@@ -1460,8 +1558,8 @@ def sls_id(id_, mods, test=None, queue=False, **kwargs):
 
     # Since this is running a specific ID within a specific SLS file, fall back
     # to the 'base' saltenv if none is configured and none was passed.
-    if opts['environment'] is None:
-        opts['environment'] = 'base'
+    if opts['saltenv'] is None:
+        opts['saltenv'] = 'base'
 
     pillar_override = kwargs.get('pillar')
     pillar_enc = kwargs.get('pillar_enc')
@@ -1495,7 +1593,7 @@ def sls_id(id_, mods, test=None, queue=False, **kwargs):
         split_mods = mods.split(',')
     st_.push_active()
     try:
-        high_, errors = st_.render_highstate({opts['environment']: split_mods})
+        high_, errors = st_.render_highstate({opts['saltenv']: split_mods})
     finally:
         st_.pop_active()
     errors += st_.state.verify_high(high_)
@@ -1521,7 +1619,7 @@ def sls_id(id_, mods, test=None, queue=False, **kwargs):
     if not ret:
         raise SaltInvocationError(
             'No matches for ID \'{0}\' found in SLS \'{1}\' within saltenv '
-            '\'{2}\''.format(id_, mods, opts['environment'])
+            '\'{2}\''.format(id_, mods, opts['saltenv'])
         )
     return ret
 
@@ -1572,8 +1670,8 @@ def show_low_sls(mods, test=None, queue=False, **kwargs):
 
     # Since this is dealing with a specific SLS file (or files), fall back to
     # the 'base' saltenv if none is configured and none was passed.
-    if opts['environment'] is None:
-        opts['environment'] = 'base'
+    if opts['saltenv'] is None:
+        opts['saltenv'] = 'base'
 
     pillar_override = kwargs.get('pillar')
     pillar_enc = kwargs.get('pillar_enc')
@@ -1604,7 +1702,7 @@ def show_low_sls(mods, test=None, queue=False, **kwargs):
         mods = mods.split(',')
     st_.push_active()
     try:
-        high_, errors = st_.render_highstate({opts['environment']: mods})
+        high_, errors = st_.render_highstate({opts['saltenv']: mods})
     finally:
         st_.pop_active()
     errors += st_.state.verify_high(high_)
@@ -1643,7 +1741,7 @@ def show_sls(mods, test=None, queue=False, **kwargs):
 
     .. code-block:: bash
 
-        salt '*' state.show_sls core,edit.vim dev
+        salt '*' state.show_sls core,edit.vim saltenv=dev
     '''
     if 'env' in kwargs:
         # "env" is not supported; Use "saltenv".
@@ -1659,8 +1757,8 @@ def show_sls(mods, test=None, queue=False, **kwargs):
 
     # Since this is dealing with a specific SLS file (or files), fall back to
     # the 'base' saltenv if none is configured and none was passed.
-    if opts['environment'] is None:
-        opts['environment'] = 'base'
+    if opts['saltenv'] is None:
+        opts['saltenv'] = 'base'
 
     pillar_override = kwargs.get('pillar')
     pillar_enc = kwargs.get('pillar_enc')
@@ -1693,7 +1791,7 @@ def show_sls(mods, test=None, queue=False, **kwargs):
         mods = mods.split(',')
     st_.push_active()
     try:
-        high_, errors = st_.render_highstate({opts['environment']: mods})
+        high_, errors = st_.render_highstate({opts['saltenv']: mods})
     finally:
         st_.pop_active()
     errors += st_.state.verify_high(high_)
@@ -1859,6 +1957,7 @@ def pkg(pkg_path,
         salt '*' state.pkg /tmp/salt_state.tgz 760a9353810e36f6d81416366fc426dc md5
     '''
     # TODO - Add ability to download from salt master or other source
+    popts = _get_opts(**kwargs)
     if not os.path.isfile(pkg_path):
         return {}
     if not salt.utils.hashutils.get_hash(pkg_path, hash_type) == pkg_sum:
@@ -1893,7 +1992,6 @@ def pkg(pkg_path,
         with salt.utils.files.fopen(roster_grains_json, 'r') as fp_:
             roster_grains = json.load(fp_, object_hook=salt.utils.data.decode_dict)
 
-    popts = _get_opts(**kwargs)
     if os.path.isfile(roster_grains_json):
         popts['grains'] = roster_grains
     popts['fileclient'] = 'local'
