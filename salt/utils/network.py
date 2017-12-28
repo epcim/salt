@@ -263,6 +263,33 @@ def is_ipv6(ip):
         return False
 
 
+def is_subnet(cidr):
+    '''
+    Returns a bool telling if the passed string is an IPv4 or IPv6 subnet
+    '''
+    return is_ipv4_subnet(cidr) or is_ipv6_subnet(cidr)
+
+
+def is_ipv4_subnet(cidr):
+    '''
+    Returns a bool telling if the passed string is an IPv4 subnet
+    '''
+    try:
+        return '/' in cidr and bool(ipaddress.IPv4Network(cidr))
+    except Exception:
+        return False
+
+
+def is_ipv6_subnet(cidr):
+    '''
+    Returns a bool telling if the passed string is an IPv6 subnet
+    '''
+    try:
+        return '/' in cidr and bool(ipaddress.IPv6Network(cidr))
+    except Exception:
+        return False
+
+
 @jinja_filter('is_ip')
 def is_ip_filter(ip, options=None):
     '''
@@ -1745,7 +1772,7 @@ def dns_check(addr, port, safe=False, ipv6=None):
             for h in hostnames:
                 # It's an IP address, just return it
                 if h[4][0] == addr:
-                    resolved = addr
+                    resolved = salt.utils.zeromq.ip_bracket(addr)
                     break
 
                 if h[0] == socket.AF_INET and ipv6 is True:
