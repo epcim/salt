@@ -1526,7 +1526,7 @@ def show_state_usage(queue=False, **kwargs):
     return ret
 
 
-def show_states(queue=False, **kwargs):
+def show_states(queue=False, sorted=True, **kwargs):
     '''
     Returns the list of states that will be applied on highstate.
 
@@ -1544,7 +1544,7 @@ def show_states(queue=False, **kwargs):
         assert False
         return conflict
 
-    opts = _get_opts(**kwargs)
+    opts = salt.utils.state.get_sls_opts(__opts__, **kwargs)
     try:
         st_ = salt.state.HighState(opts,
                                    proxy=__proxy__,
@@ -1553,25 +1553,55 @@ def show_states(queue=False, **kwargs):
         st_ = salt.state.HighState(opts,
                                    initial_pillar=_get_initial_pillar(opts))
 
-    if not _check_pillar(kwargs, st_.opts['pillar']):
+    errors = _get_pillar_errors(kwargs, pillar=st_.opts['pillar'])
+    if errors:
         __context__['retcode'] = 5
-        raise CommandExecutionError('Pillar failed to render',
-                                    info=st_.opts['pillar']['_errors'])
+        raise CommandExecutionError('Pillar failed to render', info=errors)
 
     st_.push_active()
+    states = []
     try:
-        result = st_.compile_low_chunks()
+        if sorted:
+            # this path slow down the computation
+            result = st_.compile_low_chunks()
+
+            if not isinstance(result, list):
+                raise Exception(result)
+
+            for s in result:
+                states.append(s['__sls__'])
+
+        else:
+            # modified complile_low_chunks,compile_high_data method
+            # TODO: way to improve by calling st_.order_chunks()
+            result = {}
+            top = st_.get_top()
+            matches = st_.top_matches(top)
+            high, errors = st_.render_highstate(matches)
+            # If there is extension data reconcile it
+            high, ext_errors = st_.state.reconcile_extend(high)
+            errors += ext_errors
+            # Verify that the high data is structurally sound
+            errors += st_.state.verify_high(high)
+            high, req_in_errors = st_.state.requisite_in(high)
+            errors += req_in_errors
+            high = st_.state.apply_exclude(high)
+
+            if errors:
+                raise Exception(errors)
+
+            # Override: Compile and verify the raw chunks
+            # chunks = st_.state.compile_high_data(high)
+            for name, body in six.iteritems(high):
+                if name.startswith('__'):
+                    continue
+                for state, run in six.iteritems(body):
+                    if '__sls__' in body:
+                        states.append(body['__sls__'])
     finally:
         st_.pop_active()
 
-    if not isinstance(result, list):
-        raise Exception(result)
-
-    states = OrderedDict()
-    for s in result:
-        states[s['__sls__']] = True
-
-    return list(states.keys())
+    return states
 
 
 def sls_id(id_, mods, test=None, queue=False, **kwargs):
